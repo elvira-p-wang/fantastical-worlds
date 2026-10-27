@@ -54,6 +54,18 @@
   #soundBtn.muted{opacity:.5}
   #cursorTrail{position:fixed;inset:0;pointer-events:none;z-index:36;overflow:hidden}
 
+  /* fallback: static poster + the two buttons, for devices that can't run the 3D scene */
+  #fallback{position:fixed;inset:0;z-index:38;display:none;flex-direction:column;
+    align-items:center;justify-content:center;gap:14px;padding:12px;box-sizing:border-box;
+    background:#2f3f9d}
+  body.fallback #fallback{display:flex}
+  body.fallback #curtain,body.fallback canvas,body.fallback #posterLayer{display:none}
+  body.fallback,body.fallback *{cursor:auto}
+  body.fallback .prog-btn,body.fallback .book-btn{cursor:pointer}
+  #fallback img{max-width:100%;max-height:calc(100vh - 92px);max-height:calc(100dvh - 92px);
+    object-fit:contain;border-radius:6px}
+  .fb-bar{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .fb-bar .prog-btn,.fb-bar .book-btn{font-size:12px;padding:.8em 1.6em;letter-spacing:.12em}
   /* programme card: opens over the poster, same cream/navy language as the bubbles */
   #programme{position:fixed;inset:0;z-index:35;display:flex;align-items:center;
     justify-content:center;background:rgba(20,25,70,.6);opacity:0;visibility:hidden;
@@ -266,6 +278,13 @@
 </style>
 </head>
 <body>
+<div id="fallback">
+  <img src="og.jpg" alt="Fantastical Worlds — Sydney University Wind Orchestra, Sat 31 October 2026, Verbrugghen Hall">
+  <div class="fb-bar">
+    <button class="prog-btn" id="fbProg" type="button">Programme</button>
+    <a class="book-btn" href="https://boxoffice-music.sydney.edu.au/tiny/SUWO102026" target="_blank" rel="noopener">Book Tickets</a>
+  </div>
+</div>
 <div id="curtain"><div class="cpanel top"></div><div class="cpanel bot"></div><div class="staff"><i></i><i></i><i></i><i></i><i></i><span class="cnote">♪</span></div><div class="cbegin"><span class="m">click to begin</span><span class="t">tap to begin</span></div></div>
 <img id="overlay" src="poster.png" alt="">
 <div id="posterLayer"><div class="pl-inner" id="plInner">
@@ -329,16 +348,37 @@
 <button id="soundBtn" class="muted" aria-label="toggle background music" title="music">♪</button>
 
 <script>
-/* safety net for in-app browsers (Instagram etc.) that can't run the 3D scene:
-   if the intro never starts, tell the visitor how to open it in a real browser */
-setTimeout(function(){
-  if(document.body.classList.contains('go')) return;
-  var c=document.getElementById('curtain'); if(!c) return;
-  var m=document.createElement('div');
-  m.style.cssText='position:absolute;left:50%;top:calc(50% + 110px);transform:translateX(-50%);width:min(80vw,360px);text-align:center;color:#f7dcc2;font:italic 13px/1.5 Georgia,serif';
-  m.innerHTML='This page needs a full browser.<br>Tap <b>···</b> and choose <b>Open in Safari / Chrome</b>.<br><a href="https://elvira-p-wang.github.io/fantastical-worlds/" style="color:#f99d8b;pointer-events:auto">elvira-p-wang.github.io/fantastical-worlds</a>';
-  c.appendChild(m);
-},10500);
+/* Safety net, independent of the 3D module. If the scene can't start for ANY reason
+   (no WebGL, old iOS without import maps, CDN blocked/slow, a script error), show a
+   static fallback: the real poster plus Programme + Book Tickets, so nobody loses the
+   ticket link. If the scene does come up later, the fallback is removed again. */
+(function(){
+  var ready=false;
+  function setFallback(on){ if(document.body) document.body.classList.toggle('fallback',on); }
+  function webglOK(){
+    try{
+      var c=document.createElement('canvas');
+      return !!(window.WebGLRenderingContext&&(c.getContext('webgl2')||c.getContext('webgl')||c.getContext('experimental-webgl')));
+    }catch(e){ return false; }
+  }
+  window.addEventListener('suwo-ready',function(){ ready=true; setFallback(false); });
+  window.addEventListener('error',function(){          // a script error before the scene is up
+    setTimeout(function(){ if(!ready) setFallback(true); },2500);
+  });
+  document.addEventListener('DOMContentLoaded',function(){
+    if(!webglOK()) setTimeout(function(){ setFallback(true); },1200);
+    setTimeout(function(){ if(!ready) setFallback(true); },7000);   // too slow / never loaded
+  });
+  /* programme card lives here (not in the module) so it also works in fallback */
+  document.addEventListener('DOMContentLoaded',function(){
+    var el=document.getElementById('programme');
+    function setProg(on){ el.classList.toggle('open',on); el.setAttribute('aria-hidden',on?'false':'true'); }
+    ['progBtn','fbProg'].forEach(function(id){ var b=document.getElementById(id); if(b) b.onclick=function(){setProg(true);}; });
+    document.getElementById('progClose').onclick=function(){setProg(false);};
+    el.addEventListener('click',function(e){ if(e.target===el) setProg(false); });
+    addEventListener('keydown',function(e){ if(e.key==='Escape') setProg(false); });
+  });
+})();
 </script>
 <script type="importmap">
 { "imports": { "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js" } }
@@ -1640,17 +1680,6 @@ if(matchMedia('(hover: none)').matches){
   document.querySelectorAll('.bub[data-touch]').forEach(b=>b.textContent=b.dataset.touch);
 }
 
-/* ================= programme card ================= */
-const progEl=document.getElementById('programme');
-function setProg(on){
-  progEl.classList.toggle('open',on);
-  progEl.setAttribute('aria-hidden',on?'false':'true');
-}
-document.getElementById('progBtn').onclick=()=>setProg(true);
-document.getElementById('progClose').onclick=()=>setProg(false);
-progEl.addEventListener('click',e=>{ if(e.target===progEl) setProg(false); });
-addEventListener('keydown',e=>{ if(e.key==='Escape') setProg(false); });
-
 /* ================= instruments talk: speech bubbles ================= */
 const bubs={};
 document.querySelectorAll('.bub').forEach(b=>bubs[b.dataset.for]=b);
@@ -1705,6 +1734,7 @@ function tick(){
   renderer.setRenderTarget(null);
   renderer.render(postScene,postCam);
 }
+window.__suwoOK=true; dispatchEvent(new Event('suwo-ready'));   // scene is up: cancel the fallback
 tick();
 </script>
 </body>
