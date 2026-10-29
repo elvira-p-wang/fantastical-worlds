@@ -78,8 +78,7 @@
     --ph:min(80vh,56vw);--pw:calc(var(--ph)*.8);--u:calc(var(--pw)/100);--f:calc(var(--u)*var(--k,1))}
   #programme.single{--ph:80vh;--pw:min(92vw,calc(var(--ph)*.8));--k:1.28}
   @supports (height:1dvh){#programme.single{--ph:80dvh}}
-  html.prog-open,html.prog-open body{touch-action:pan-y}
-  #programme,.bk-stage{touch-action:pan-y}
+  #programme,#programme *{touch-action:none}      /* all gestures reach our pointer handlers (manual scroll) */
   .single .leaf.cur{transform:none}                 /* current page: no 3D transform, so it scrolls reliably */
   .single .pf{grid-template-columns:1fr 1fr}
   .single .bk-nav{top:auto;bottom:12px;transform:none;width:38px;height:38px;font-size:22px}
@@ -113,7 +112,7 @@
     font:italic calc(var(--f)*3.6)/1.35 'Cormorant Garamond',Georgia,serif}
   .backcover img{width:calc(var(--f)*14)}
   .pg{position:absolute;inset:0;box-sizing:border-box;padding:calc(var(--f)*7) calc(var(--f)*7.5) calc(var(--f)*6);
-    overflow-y:auto;scrollbar-width:none;touch-action:pan-y;color:#4f1f66;
+    overflow-y:auto;scrollbar-width:none;overscroll-behavior:contain;color:#4f1f66;
     font:500 calc(var(--f)*2.7)/1.28 'Cormorant Garamond','Cormorant',Georgia,serif;
     background-color:#fffaf4;
     background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .35 0 0 0 0 .22 0 0 0 0 .3 0 0 0 .08 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
@@ -621,12 +620,34 @@
     document.getElementById('progClose').onclick=function(){ setProg(false); };
     prev.onclick=function(){ goTo(state-1); }; next.onclick=function(){ goTo(state+1); };
 
-    var sx=0,sy=0,down=false;               // tap the page edge, or drag, to turn
-    stage.addEventListener('pointerdown',function(e){ down=true; sx=e.clientX; sy=e.clientY; });
+    /* gestures: tap an edge / swipe sideways to turn; drag up-down or wheel to scroll a page.
+       Scrolling is done by hand (scrollTop) because native scrolling inside the 3D book is
+       unreliable on some phones. */
+    var sx=0,sy=0,down=false,pgEl=null,startTop=0,mode=null,lastY=0,lastT=0,vel=0,raf=0;
+    function inertia(el2,v0){ var v=v0*16; (function step(){ v*=0.94; el2.scrollTop+=v; if(Math.abs(v)>0.4) raf=requestAnimationFrame(step); })(); }
+    stage.addEventListener('pointerdown',function(e){
+      cancelAnimationFrame(raf); down=true; sx=e.clientX; sy=e.clientY; mode=null;
+      pgEl=(e.target.closest&&e.target.closest('.pg'))||null; startTop=pgEl?pgEl.scrollTop:0;
+      lastY=e.clientY; lastT=performance.now(); vel=0;
+    });
+    stage.addEventListener('pointermove',function(e){
+      if(!down) return;
+      var dx=e.clientX-sx, dy=e.clientY-sy;
+      if(mode===null&&(Math.abs(dx)>8||Math.abs(dy)>8)) mode=Math.abs(dy)>Math.abs(dx)?'v':'h';
+      if(mode==='v'&&pgEl){
+        pgEl.scrollTop=startTop-dy;
+        var now=performance.now(); vel=(lastY-e.clientY)/Math.max(1,now-lastT); lastY=e.clientY; lastT=now;
+      }
+    });
     stage.addEventListener('pointercancel',function(){ down=false; });
+    stage.addEventListener('wheel',function(e){
+      var pg=e.target.closest&&e.target.closest('.pg');
+      if(pg){ pg.scrollTop+=e.deltaY; e.preventDefault(); }
+    },{passive:false});
     stage.addEventListener('pointerup',function(e){
       if(!down) return; down=false;
       var dx=e.clientX-sx, dy=e.clientY-sy;
+      if(mode==='v'){ if(pgEl&&Math.abs(vel)>0.05) inertia(pgEl,vel); return; }
       if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)){ goTo(dx<0?state+1:state-1); return; }
       if(Math.abs(dx)<10&&Math.abs(dy)<10){
         if(!(e.target.closest&&e.target.closest('.leaf,.backcover'))){ setProg(false); return; }
