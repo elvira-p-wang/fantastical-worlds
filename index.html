@@ -18,6 +18,9 @@
 <meta name="twitter:title" content="Fantastical Worlds — Sydney University Wind Orchestra">
 <meta name="twitter:image" content="https://elvira-p-wang.github.io/fantastical-worlds/og.jpg">
 <meta name="color-scheme" content="dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,700;1,500&display=swap">
 <style>
   html,body{margin:0;height:100%;background:#2f3f9d;overflow:hidden;
     font-family:ui-monospace,Menlo,monospace}
@@ -43,7 +46,6 @@
   html,body{cursor:none;touch-action:none;overscroll-behavior:none;
     -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
     -webkit-tap-highlight-color:transparent}
-  .prog-card{touch-action:pan-y}
   #ui button,#ui input[type=range]{cursor:pointer}
   /* background-music toggle: always visible, independent of the dev UI */
   #soundBtn{position:fixed;left:14px;bottom:14px;z-index:30;width:34px;height:34px;
@@ -66,31 +68,125 @@
     object-fit:contain;border-radius:6px}
   .fb-bar{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
   .fb-bar .prog-btn,.fb-bar .book-btn{font-size:12px;padding:.8em 1.6em;letter-spacing:.12em}
-  /* programme card: opens over the poster, same cream/navy language as the bubbles */
-  #programme{position:fixed;inset:0;z-index:35;display:flex;align-items:center;
-    justify-content:center;background:rgba(20,25,70,.6);opacity:0;visibility:hidden;
-    transition:opacity .35s ease,visibility 0s linear .35s}
-  #programme.open{opacity:1;visibility:visible;transition:opacity .35s ease}
-  .prog-card{position:relative;width:min(560px,92vw);max-height:86vh;overflow:auto;
-    background:#f7dcc2;color:#27338a;border-radius:14px;padding:2em 2.2em 1.6em;
-    font-family:Georgia,'Times New Roman',serif;
-    transform:translateY(14px) scale(.98);transition:transform .45s cubic-bezier(.2,1.1,.4,1)}
-  #programme.open .prog-card{transform:none}
-  .prog-card h2{margin:0;font-size:clamp(16px,2.2vw,22px);font-style:italic;font-weight:400;
-    letter-spacing:.02em}
-  .prog-card .prog-sub{margin:.25em 0 1.1em;font-size:11px;letter-spacing:.14em;
-    text-transform:uppercase;opacity:.65}
-  .prog-card ul{list-style:none;margin:0;padding:0}
-  .prog-card li{display:flex;justify-content:space-between;align-items:baseline;gap:1.2em;
-    padding:.55em 0;border-top:1px solid rgba(39,51,142,.18);font-size:clamp(12px,1.4vw,15px)}
-  .prog-card li:first-child{border-top:none}
-  .prog-card li span{font-size:.82em;font-style:italic;opacity:.7;text-align:right;
-    white-space:nowrap}
-  .prog-close{position:absolute;top:.7em;right:.9em;background:none;border:none;
-    color:#27338a;font-size:22px;line-height:1;cursor:pointer;opacity:.7}
-  .prog-close:hover{opacity:1}
-  @media (max-width:520px){.prog-card li{flex-direction:column;gap:.1em}
-    .prog-card li span{text-align:left;white-space:normal}}
+  /* ============ programme booklet: a real page-turning book (3 leaves = 6 pages) ============
+     Wide screens show a two-page spread; narrow/portrait screens show one page at a time.
+     All sizes derive from --u (1% of a page's width) so the layout scales as one object. */
+  #programme{position:fixed;inset:0;z-index:35;opacity:0;visibility:hidden;
+    background:radial-gradient(ellipse at 50% 38%,rgba(40,52,128,.86),rgba(12,16,52,.95));
+    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+    transition:opacity .45s ease,visibility 0s linear .45s;
+    --ph:min(80vh,56vw);--pw:calc(var(--ph)*.8);--u:calc(var(--pw)/100);--f:calc(var(--u)*var(--k,1))}
+  #programme.single{--ph:min(74vh,112vw);--k:1.28}
+  #programme.open{opacity:1;visibility:visible;transition:opacity .45s ease}
+  .bk-stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;touch-action:none;
+    filter:drop-shadow(0 26px 36px rgba(0,0,0,.5))}
+  .bk-wrap{position:relative;width:var(--pw);height:var(--ph);perspective:2600px;
+    opacity:0;transform:translateY(26px) scale(.95);
+    transition:opacity .5s ease,transform .8s cubic-bezier(.2,.9,.3,1)}
+  #programme.open .bk-wrap{opacity:1;transform:none;transition-delay:.12s}
+  #programme.single .bk-wrap{clip-path:inset(-12% -12% -12% 0)}
+  .book{position:absolute;inset:0;transform-style:preserve-3d;
+    transition:transform 1.05s cubic-bezier(.65,.05,.3,1)}
+  .book[data-shift="1"]{transform:translateX(calc(var(--pw)/2))}
+  .leaf{position:absolute;inset:0;transform-style:preserve-3d;transform-origin:left center;
+    transform:rotateY(0) translateZ(calc(var(--i)*-.4px));
+    transition:transform 1.15s cubic-bezier(.6,.05,.25,1)}
+  .leaf.flipped{transform:rotateY(-180deg) translateZ(calc(var(--i)*-.4px))}
+  .face{position:absolute;inset:0;overflow:hidden;background:#fffaf4;
+    -webkit-backface-visibility:hidden;backface-visibility:hidden}
+  .face.front{border-radius:2px 7px 7px 2px;
+    box-shadow:1px 0 0 rgba(75,29,99,.08),3px 0 0 #f3eadf,5px 0 0 #e9ddcf}
+  .face.back{transform:rotateY(180deg);border-radius:7px 2px 2px 7px}
+  .face::after{content:"";position:absolute;inset:0;pointer-events:none}
+  .face.front::after{background:linear-gradient(90deg,rgba(45,20,65,.30) 0,rgba(45,20,65,.07) 4.5%,transparent 12%)}
+  .face.back::after{background:linear-gradient(270deg,rgba(45,20,65,.30) 0,rgba(45,20,65,.07) 4.5%,transparent 12%)}
+  .backcover{position:absolute;inset:0;transform:translateZ(-3px);border-radius:2px 7px 7px 2px;
+    background:#4f1f66;color:#f5dfa8;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:calc(var(--f)*4);text-align:center;
+    font:italic calc(var(--f)*3.6)/1.35 'Cormorant Garamond',Georgia,serif}
+  .backcover img{width:calc(var(--f)*14)}
+  .pg{position:absolute;inset:0;box-sizing:border-box;padding:calc(var(--f)*7) calc(var(--f)*7.5) calc(var(--f)*6);
+    overflow-y:auto;scrollbar-width:none;touch-action:pan-y;color:#4f1f66;
+    font:500 calc(var(--f)*2.7)/1.28 'Cormorant Garamond','Cormorant',Georgia,serif;
+    background-color:#fffaf4;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .35 0 0 0 0 .22 0 0 0 0 .3 0 0 0 .08 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
+  .pg::-webkit-scrollbar{display:none}
+  .pg .corner{position:absolute;top:calc(var(--f)*3.2);right:calc(var(--f)*3.6);width:calc(var(--f)*6)}
+  .pg h2{margin:0 0 calc(var(--f)*3.4);text-align:center;font-weight:700;font-size:calc(var(--f)*6.6);line-height:1.05}
+  .pg.blank{background-image:none}
+  /* cover */
+  .pg.cover{display:flex;flex-direction:column;align-items:center;justify-content:space-between;text-align:center}
+  .cover .c-top{font-weight:700;font-size:calc(var(--f)*4.6)}
+  .cover .c-title{width:104%;margin:0 -2%}
+  .cover .c-with b{display:block;font-size:calc(var(--f)*4.4)}
+  .cover .c-with span{font-size:calc(var(--f)*3.6)}
+  .cover .c-foot{font-size:calc(var(--f)*3.1);line-height:1.3}
+  .cover .c-usu{display:block;margin:calc(var(--f)*2.2) auto 0;width:calc(var(--f)*26)}
+  /* programme list */
+  .pg.prog{padding-top:calc(var(--f)*5.5);padding-bottom:calc(var(--f)*4)}
+  .prog h2{font-size:calc(var(--f)*5.4);margin-bottom:calc(var(--f)*2.4)}
+  .it{display:flex;justify-content:space-between;gap:calc(var(--f)*1.6);margin-bottom:calc(var(--f)*1.9)}
+  .it .l{flex:1 1 auto;max-width:57%}
+  .it .l b{display:block;font-weight:700;font-size:calc(var(--f)*2.75);line-height:1.12}
+  .it .l .sub{display:block;font-size:calc(var(--f)*2.0);line-height:1.22;margin-top:.2em}
+  .it .l .sub.pm{font-style:italic}
+  .it .r{text-align:right;font-size:calc(var(--f)*2.5);line-height:1.18;max-width:43%}
+  .single .it{flex-direction:column;gap:.15em;margin-bottom:calc(var(--f)*2.2)}
+  .single .it .l,.single .it .r{max-width:100%;text-align:left}
+  .single .it .r{font-style:italic;opacity:.85}
+  .brk{text-align:center;letter-spacing:.14em;text-transform:uppercase;font-size:calc(var(--f)*2.1);
+    margin:calc(var(--f)*.8) 0 calc(var(--f)*1.8)}
+  /* performers */
+  .pg .org{text-align:center;font-weight:700;font-size:calc(var(--f)*4.2)}
+  .pf{display:grid;grid-template-columns:repeat(3,1fr);gap:calc(var(--f)*2.2);margin-top:calc(var(--f)*2)}
+  .pf .sec{margin-bottom:calc(var(--f)*2.5)}
+  .pf h4{margin:0 0 .25em;font-weight:700;font-size:calc(var(--f)*2.4);line-height:1.1}
+  .pf div div{font-size:calc(var(--f)*2.3);line-height:1.36}
+  /* notes */
+  .note{margin-bottom:calc(var(--f)*2.4)}
+  .note h3{margin:0;font-size:calc(var(--f)*4.4);font-weight:700;line-height:1.05}
+  .note .role{font-size:calc(var(--f)*2.2);margin-bottom:calc(var(--f)*1.2)}
+  .note img{float:left;width:calc(var(--f)*18);margin:0 calc(var(--f)*2.6) calc(var(--f)*.8) 0}
+  .note p{margin:0 0 .65em;font-size:calc(var(--f)*2.1);line-height:1.28}
+  .note::after{content:"";display:block;clear:both}
+  .rule{border-top:1px solid rgba(79,31,102,.45);margin:calc(var(--f)*2) 0}
+  .by{font-weight:700;font-size:calc(var(--f)*2.2)}
+  .note.s h3{font-size:calc(var(--f)*3.9)}
+  .pg.notes{padding-top:calc(var(--f)*5.5);padding-bottom:calc(var(--f)*4)}
+  .notes h2{font-size:calc(var(--f)*5.4);margin-bottom:calc(var(--f)*2.2)}
+  /* thanks */
+  .team{display:grid;grid-template-columns:1fr 1fr;gap:0 calc(var(--f)*4)}
+  .team .row{display:flex;justify-content:space-between;gap:calc(var(--f)*1.4);margin-bottom:calc(var(--f)*1.7);font-size:calc(var(--f)*2.5)}
+  .team .row b{font-weight:700}
+  .team .row span{white-space:nowrap}
+  .thanks{text-align:center;margin-top:calc(var(--f)*3.4)}
+  .thanks h3{margin:0 0 calc(var(--f)*1.2);font-size:calc(var(--f)*4.4);font-weight:700}
+  .thanks .t{margin-bottom:calc(var(--f)*1.6);font-size:calc(var(--f)*2.5)}
+  .thanks .t b{display:block}
+  .aoc h2{font-size:calc(var(--f)*5.2);margin:calc(var(--f)*3) 0 calc(var(--f)*1.6)}
+  .aoc p{margin:0;text-align:center;font-size:calc(var(--f)*2.55);line-height:1.35}
+  /* chrome around the book */
+  .bk-close{position:absolute;top:14px;right:18px;z-index:3;background:none;border:none;
+    color:#f7dcc2;font-size:30px;line-height:1;cursor:pointer;opacity:.8}
+  .bk-close:hover{opacity:1}
+  .bk-nav{position:absolute;top:50%;transform:translateY(-50%);z-index:3;width:44px;height:44px;
+    border-radius:50%;border:1px solid rgba(247,220,194,.45);background:rgba(20,25,70,.5);
+    color:#f7dcc2;font-size:26px;line-height:1;cursor:pointer;padding:0 0 3px}
+  .bk-nav.prev{left:max(10px,2.5vw)}.bk-nav.next{right:max(10px,2.5vw)}
+  .bk-nav:hover{background:rgba(247,220,194,.18)}
+  .bk-nav:disabled{opacity:.2;cursor:default;pointer-events:none}
+  .bk-foot{position:absolute;left:0;right:0;bottom:14px;display:flex;flex-direction:column;
+    align-items:center;gap:9px;pointer-events:none;color:rgba(247,220,194,.7);
+    font:italic 12px Georgia,serif;letter-spacing:.06em}
+  .bk-dots{display:flex;gap:9px;pointer-events:auto}
+  .dot{width:7px;height:7px;border-radius:50%;border:none;padding:0;background:rgba(247,220,194,.3);cursor:pointer}
+  .dot.on{background:#f7dcc2;transform:scale(1.35)}
+  .bk-hint{opacity:0}
+  #programme.open .bk-hint{animation:bkHint 7s ease .9s both}
+  .bk-hint .t{display:none}
+  @media (hover:none){.bk-hint .m{display:none}.bk-hint .t{display:inline}}
+  @keyframes bkHint{0%{opacity:0}12%{opacity:1}80%{opacity:1}100%{opacity:0}}
+  @media (prefers-reduced-motion:reduce){.leaf,.book{transition-duration:.01s}}
 
   /* ---- phones: the poster fills the width, so bump every text size above the
      desktop clamp floors, stack the buttons, and make bubbles readable ---- */
@@ -102,8 +198,6 @@
     .cta-row{flex-direction:column;align-items:flex-end;gap:.5em}
     .book-btn,.prog-btn{font-size:10px;padding:.7em 1.4em}
     .bub{font-size:9.5px;max-width:32%}
-    #programme{align-items:flex-end}
-    .prog-card{width:100%;border-radius:16px 16px 0 0;max-height:82vh;padding:1.6em 1.4em 1.3em}
   }
   .trailNote{position:absolute;color:#f7dcc2;
     transform:translate(-50%,-50%) rotate(0deg) scale(1);
@@ -321,23 +415,11 @@
   </div>
 </div></div>
 <div id="programme" aria-hidden="true">
-  <div class="prog-card" role="dialog" aria-label="Programme">
-    <button class="prog-close" id="progClose" type="button" aria-label="Close">×</button>
-    <h2 style="margin-bottom:.9em">On the programme</h2>
-    <ul>
-      <li>Howl’s Moving Castle: Symphonic Fantasy for Band<span>Joe Hisaishi, arr. Yo Goto</span></li>
-      <li>Stardust Crusaders<span>Yugo Kanno, arr. Miyagawa</span></li>
-      <li>The Devil Went Down to Georgia<span>Charlie Daniels, arr. Brown</span></li>
-      <li>Mother of a Revolution<span>Thomas</span></li>
-      <li>Ancient Flower<span>Nishimura</span></li>
-      <li>Danzón No. 2<span>Arturo Márquez, arr. Nickel</span></li>
-      <li>Overture: “Beyond the Darial Pass”<span>Shaun Ji-Thompson</span></li>
-      <li>Blood Water<span>Jasmine Good</span></li>
-      <li>Shifting Atmospheres<span>Riley Dunlop</span></li>
-      <li>Children’s March: “Over the Hills and Far Away”<span>Percy Grainger, ed. Rogers</span></li>
-      <li>Primula<span>Kato</span></li>
-    </ul>
-  </div>
+  <button class="bk-close" id="progClose" type="button" aria-label="Close programme">×</button>
+  <div class="bk-stage" id="bkStage"><div class="bk-wrap"><div class="book" id="book" data-shift="0"></div></div></div>
+  <button class="bk-nav prev" id="bkPrev" type="button" aria-label="Previous page">‹</button>
+  <button class="bk-nav next" id="bkNext" type="button" aria-label="Next page">›</button>
+  <div class="bk-foot"><div class="bk-dots" id="bkDots"></div><div class="bk-hint"><span class="m">click a page edge or drag to turn</span><span class="t">swipe to turn the page</span></div></div>
 </div>
 <div id="ui">
   <button id="btnOverlay">poster&nbsp;[O]</button>
@@ -369,14 +451,179 @@
     if(!webglOK()) setTimeout(function(){ setFallback(true); },1200);
     setTimeout(function(){ if(!ready) setFallback(true); },7000);   // too slow / never loaded
   });
-  /* programme card lives here (not in the module) so it also works in fallback */
+  /* programme booklet (here, not in the module, so it also works in the fallback view) */
   document.addEventListener('DOMContentLoaded',function(){
-    var el=document.getElementById('programme');
-    function setProg(on){ el.classList.toggle('open',on); el.setAttribute('aria-hidden',on?'false':'true'); }
-    ['progBtn','fbProg'].forEach(function(id){ var b=document.getElementById(id); if(b) b.onclick=function(){setProg(true);}; });
-    document.getElementById('progClose').onclick=function(){setProg(false);};
-    el.addEventListener('click',function(e){ if(e.target===el) setProg(false); });
-    addEventListener('keydown',function(e){ if(e.key==='Escape') setProg(false); });
+    var el=document.getElementById('programme'), book=document.getElementById('book'),
+        prev=document.getElementById('bkPrev'), next=document.getElementById('bkNext'),
+        dotsEl=document.getElementById('bkDots'), stage=document.getElementById('bkStage');
+    var state=0,N=4,single=false,leaves=[],isOpen=false,built=false,ac=null;
+
+    var PAGES=[
+`<div class="pg cover"><img class="corner" src="prog_logo.png" alt="">
+  <div class="c-top">Sydney University Wind Orchestra</div>
+  <img class="c-title" src="prog_title.png" alt="Fantastical Worlds">
+  <div class="c-with"><b>with Cathy Chan</b><span>conductor</span></div>
+  <div class="c-foot">October 31, 2026, 19:00<br>Verbrugghen Hall, Sydney Conservatorium of Music<img class="c-usu" src="prog_usu.png" alt="USU Clubs"></div></div>`,
+
+`<div class="pg prog"><img class="corner" src="prog_logo.png" alt="">
+  <h2>Concert Programme</h2>
+  <div class="it"><div class="l"><b>Overture: “Beyond the Darial Pass” (2026)</b><span class="sub pm">(World premiere performance)</span></div><div class="r">Shaun Ji-Thompson (b. 1995)</div></div>
+  <div class="it"><div class="l"><b>The Devil Went Down to Georgia</b></div><div class="r">Charlie Daniels Band (1972 - 2020)<br>arr. Michael Brown (b. 1962)</div></div>
+  <div class="it"><div class="l"><b>Children's March: “Over the Hills and Far Away”</b><span class="sub">Zhan Luo, conductor</span></div><div class="r">Percy Grainger (1882 - 1961)<br>arr. Mark Rogers (b. 1955)</div></div>
+  <div class="it"><div class="l"><b>Shifting Atmospheres for Brass Quintet (2026)</b><span class="sub pm">(World premiere performance)</span><span class="sub">Shaun Ji-Thompson, french horn; Archie, trombone; Chris, trumpet; Daniel Jun, trumpet; Anthony Brookmann, tuba</span></div><div class="r">Riley Dunlop (b. 2008)</div></div>
+  <div class="it"><div class="l"><b>Ancient Flower</b></div><div class="r">Yukiko Nishimura (b. 1967)</div></div>
+  <div class="it"><div class="l"><b>Danzón No. 2</b><span class="sub">Jasmine Zaitsev, conductor</span></div><div class="r">Arturo Marquez (b. 1950)<br>arr. Oliver Nickel (b. 1973)</div></div>
+  <div class="brk">– Intermission –</div>
+  <div class="it"><div class="l"><b>A Mother of A Revolution!</b></div><div class="r">Omar Thomas (b. 1984)</div></div>
+  <div class="it"><div class="l"><b>Primula for Saxophone Trio</b><span class="sub">Zhan Luo, alto saxophone; Ella Tang, tenor saxophone; Jasmine Zaitsev, baritone saxophone</span></div><div class="r">Daiki Kato (b. ?)</div></div>
+  <div class="it"><div class="l"><b>Blood Water (2025)</b><span class="sub pm">(World premiere performance)</span></div><div class="r">Jasmine Good (b. 2004)</div></div>
+  <div class="it"><div class="l"><b>Howl’s Moving Castle: Symphonic Fantasy for Band</b></div><div class="r">Joe Hisaishi (b. 1950)<br>arr. Yo Goto (b. 1958)</div></div>
+  <div class="brk">– President’s Address –</div>
+  <div class="it"><div class="l"><b>Stardust Crusaders</b></div><div class="r">Yugo Kanno (b. 1977)<br>arr. Seiji Miyagawa (b. ?)</div></div></div>`,
+
+`<div class="pg"><img class="corner" src="prog_logo.png" alt="">
+  <div class="org">Sydney University Wind Orchestra</div><h2>Performers</h2>
+  <div class="pf">
+   <div>
+    <div class="sec"><h4>Flute/Piccolo</h4><div><div>Madi Hynd (SEC LDR)</div><div>Miranda Keens</div><div>Tori Kim</div><div>Meilin Liu</div><div>Eloise Milne</div><div>Joshua Park</div><div>Aurora Shang</div><div>Lakshitha Sundararajan</div><div>Jai Webster</div></div></div>
+    <div class="sec"><h4>Oboe/English Horn</h4><div><div>Thomas Chen (SEC LDR)</div><div>Elvira Wang</div></div></div>
+    <div class="sec"><h4>Bassoon</h4><div><div>Sebastian Lenehan Choo</div><div>Ambrose Phelps</div></div></div>
+    <div class="sec"><h4>B-flat Clarinet</h4><div><div>Harley Jackson (SEC LDR)</div><div>Yinfan Lin</div><div>Sam O’Donnell</div><div>Megha Sannigrahi</div><div>Jasmine Shi</div><div>Bill Yang</div></div></div>
+   </div>
+   <div>
+    <div class="sec"><h4>Bass Clarinet</h4><div><div>Matthew Flind</div></div></div>
+    <div class="sec"><h4>Alto/Tenor/Baritone Saxophone</h4><div><div>Ella Tang (SEC LDR)</div><div>Olivia Coppin</div><div>Angel Indrawan</div><div>Sara Long</div><div>Zhan Luo</div><div>Jasmine Zaitsev</div></div></div>
+    <div class="sec"><h4>Trumpet</h4><div><div>Christopher Czernecki</div><div>Riley Dunlop</div><div>Daniel Ho Jin Jun</div><div>Yumi Ota</div><div>Samuel Ruszczyk</div><div>Laura Stern</div></div></div>
+    <div class="sec"><h4>French Horn</h4><div><div>Shaun Ji-Thompson</div><div>Brad Kagan</div></div></div>
+   </div>
+   <div>
+    <div class="sec"><h4>Trombone</h4><div><div>Leo Ding</div><div>Hayden Li</div><div>Adrian Widjaja</div><div>Gordon Wang</div></div></div>
+    <div class="sec"><h4>Euphonium</h4><div><div>Lucinda Ackland</div><div>Julian Eckermann</div></div></div>
+    <div class="sec"><h4>Tuba</h4><div><div>Anthony Broockmann (SEC LDR)</div><div>An-Yu Chiu</div></div></div>
+    <div class="sec"><h4>Percussion</h4><div><div>Harrison Ando (SEC LDR)</div><div>Nico Bachner</div><div>James Chang</div><div>Julia McGann</div><div>Jasmine Mo</div><div>Emil Vinod</div></div></div>
+    <div class="sec"><h4>Piano</h4><div><div>Calvin Lien</div><div>Akira Wong</div></div></div>
+   </div>
+  </div></div>`,
+
+`<div class="pg notes"><img class="corner" src="prog_logo.png" alt="">
+  <h2>Program Notes</h2>
+  <div class="note"><h3>Jasmine Good (b. 2004)</h3><div class="role">Composer of <i>Blood Water</i> (2025)</div>
+   <img src="prog_good.png" alt="Jasmine Good">
+   <p>Jasmine Good (she/her) is an Australian composer, performer and educator whose work was awarded Gold at the 2026 Mozart International Music Competition for BLOOD WATER. She believes music should reflect rather than instruct. Rather than communicating a fixed message, her compositions are designed to evolve through interpretation, becoming shaped by the performers who bring them to life and the audiences who encounter them.</p>
+   <p>Working across concert music, choral repertoire, wind ensemble and musical theatre, Jasmine creates works that resist definitive interpretation. Guided by mathematical systems, geometry and pattern, she uses compositional constraint as a catalyst for invention, allowing unexpected musical ideas to emerge within carefully constructed frameworks.</p>
+   <p>Winner of MUSE's 2024 annual search for new works, her original musical The Futility of Falling premiered at Sydney's Flight Path Theatre. Whether writing for professional ensembles or community musicians, Jasmine composes works that continue to grow long after the final note has been written.</p></div>
+  <div class="note"><h3>Riley Dunlop (b. 2008)</h3><div class="role">Composer of <i>Shifting Atmospheres</i> (2026)</div>
+   <img src="prog_riley.png" alt="Riley Dunlop">
+   <p>I am a first year uni student studying a degree in composition at the Sydney Conservatorium of Music. I have experience with writing for various types of small ensembles and have a particular focus for the portrayal of imagery in my compositions. The piece that will be performed is called Shifting Atmospheres and it revolves around ideas it change and how it can be both uplifting, powerful but also scary at times! This piece was written last semester as a part of my degree, originally for brass quartet, but was adapted to include tuba as a quintet.</p></div></div>`,
+
+`<div class="pg notes"><img class="corner" src="prog_logo.png" alt="">
+  <div class="note s"><h3>Shaun Ji-Thompson (b. 1995)</h3><div class="role">Composer of <i>Overture: “Beyond the Darial Pass”</i> (2026)</div>
+   <img src="prog_shaun.png" alt="Shaun Ji-Thompson">
+   <p>Born in Beijing and raised in Brisbane, Shaun Ji-Thompson is a Sydney-based composer whose earliest childhood musical experiences include listening to Puccini with his mother. Multilingual and having travelled to over 60 countries, his outlook has been shaped by journeys through Almoravid trans-Saharan trade routes, militarised borderlands of the Nagorno-Karabakh conflict, and secluded Siberian villages during the depths of winter.</p>
+   <p>With a particular fascination for Eastern European and Middle Eastern history, his music explores dramatic landscapes, human endurance and the thresholds of human emotion.</p>
+   <p>A first-place winner of ASME's Queensland Young Composers' Competition in 2012 and a multi-instrumentalist, Shaun is particularly interested in expanding the emotional expressivity of the wind band, exploring its capacity to convey the dramatic intensity, intimacy and psychological depth traditionally associated with opera and the symphony orchestra.</p></div>
+  <div class="rule"></div>
+  <div class="note s"><div class="by">Zhan Luo</div><h3>On <i>Children’s March</i></h3>
+   <p>Percy Grainger composed Children's March in 1918 while he was a member of the US Coast Guard band. Despite the folk-esque melodies, Children’s March was one of Grainger’s first original compositions and extensively showcases the low woodwinds throughout the piece. Furthermore, the composition is unique in including two four-part vocal sections sung by members of the band not playing as well as employing piano extensively throughout. The dedication to ‘my playmate over the hills’ is believed to be Karen Holton with whom Grainger shared a lengthy relationship with during the early 1900s.</p></div>
+  <div class="note s"><div class="by">Jasmine Zaitsev</div><h3>On <i>Danzon No. 2</i></h3>
+   <p>I’m a 3rd year Bachelor of Music student at the Sydney Conservatorium of Music majoring in classical saxophone, and an emerging conductor passionate about exploring the world of conducting alongside performing. This is my second semester working with SUWO and I’m excited to continue making music with the ensemble! Arturo Márquez’s Danzón No. 2 is so full of energy, colour and incredible rhythms that make you want to move! Inspired by the traditional danzón dance, the piece combines sultry melodies with exciting rhythmic drive and explosive moments. I hope you enjoy the ride!</p></div></div>`,
+
+`<div class="pg"><img class="corner" src="prog_logo.png" alt="">
+  <h2>SUWO Executive Team 2026</h2>
+  <div class="team">
+   <div><div class="row"><b>President</b><span>Yinfan Lin</span></div><div class="row"><b>Vice-President</b><span>Olivia Coppin</span></div><div class="row"><b>Secretary</b><span>Harley Jackson</span></div><div class="row"><b>Treasurer</b><span>Nico Bachner</span></div><div class="row"><b>IT Officer</b><span>Bill Yang</span></div><div class="row"><b>Publicity Officer</b><span>Jasmine Shi</span></div></div>
+   <div><div class="row"><b>Social Coordinator</b><span>Thomas Chen</span></div><div class="row"><b>Librarian</b><span>Madi Hynd</span></div><div class="row"><b>Equipment Officer</b><span>Julia McGann</span></div><div class="row"><b>General Executive</b><span>Harrison Ando</span></div><div class="row"><b>General Executive</b><span>Matthew Flind</span></div></div>
+  </div>
+  <div class="thanks"><h3>With special thanks to:</h3>
+   <div class="t"><b>Elvira Wang</b><i>Fantastical Worlds</i> poster, program, and website design</div>
+   <div class="t"><b>Vera Xia</b>Concert photography</div>
+   <div class="t"><b>Daniel Liu</b>Concert videography</div></div>
+  <div class="aoc"><h2>Acknowledgement of Country</h2>
+   <p>SUWO acknowledges the Traditional Custodians of the land on which we perform, the Gadigal people of the Eora Nation, and recognise their continuing connections to the land and community. We pay our respects to Elders past, present and emerging.</p></div></div>`
+    ];
+    var BLANK='<div class="pg blank"></div>';
+
+    function wantSingle(){ return innerWidth<760 || innerHeight>innerWidth*1.1; }
+    function addLeaf(i,f,b){
+      var lf=document.createElement('div'); lf.className='leaf'; lf.style.setProperty('--i',i);
+      lf.innerHTML='<div class="face front">'+f+'</div><div class="face back">'+b+'</div>';
+      book.appendChild(lf); leaves.push(lf);
+    }
+    function build(){
+      single=wantSingle(); el.classList.toggle('single',single);
+      book.innerHTML=''; leaves=[];
+      if(!single){
+        book.insertAdjacentHTML('beforeend','<div class="backcover"><img src="prog_logo.png" alt=""><div>Thank you for joining us<br>in these fantastical worlds.</div></div>');
+        N=4; for(var i=0;i<3;i++) addLeaf(i,PAGES[2*i],PAGES[2*i+1]);
+      } else {
+        N=6; for(var j=0;j<6;j++) addLeaf(j,PAGES[j],BLANK);
+      }
+      dotsEl.innerHTML='';
+      for(var s=0;s<N;s++){
+        var b=document.createElement('button'); b.className='dot'; b.type='button';
+        b.setAttribute('aria-label','Go to page '+(s+1));
+        (function(s){ b.onclick=function(){ goTo(s); }; })(s);
+        dotsEl.appendChild(b);
+      }
+      state=Math.min(state,N-1); apply();
+    }
+    function apply(){
+      leaves.forEach(function(lf,i){ lf.classList.toggle('flipped',i<state); });
+      book.dataset.shift=(!single&&state>0)?'1':'0';
+      for(var k=0;k<dotsEl.children.length;k++) dotsEl.children[k].classList.toggle('on',k===state);
+      prev.disabled=(state===0); next.disabled=(state===N-1);
+    }
+    function swish(){                       // soft paper sound; respects the ♪ mute button
+      try{
+        var sb=document.getElementById('soundBtn'); if(sb&&sb.classList.contains('muted')) return;
+        ac=ac||new (window.AudioContext||window.webkitAudioContext)();
+        if(ac.state==='suspended') ac.resume();
+        var d=0.42,n=Math.floor(ac.sampleRate*d),buf=ac.createBuffer(1,n,ac.sampleRate),ch=buf.getChannelData(0);
+        for(var i=0;i<n;i++){ var x=i/n; ch[i]=(Math.random()*2-1)*Math.pow(1-x,1.7)*Math.min(1,x*9); }
+        var src=ac.createBufferSource(); src.buffer=buf;
+        var f=ac.createBiquadFilter(); f.type='bandpass'; f.Q.value=.7;
+        var t=ac.currentTime; f.frequency.setValueAtTime(900,t); f.frequency.exponentialRampToValueAtTime(3400,t+d*.85);
+        var g=ac.createGain(); g.gain.value=.14;
+        src.connect(f); f.connect(g); g.connect(ac.destination); src.start(t);
+      }catch(e){}
+    }
+    function goTo(s){ s=Math.max(0,Math.min(N-1,s)); if(s===state) return; swish(); state=s; apply(); }
+    function setProg(on){
+      if(on===isOpen) return; isOpen=on;
+      if(on){ if(!built||wantSingle()!==single){ state=0; build(); built=true; } }
+      else setTimeout(function(){ if(!isOpen&&built){ state=0; apply(); } },600);   // back to the cover, unseen
+      el.classList.toggle('open',on); el.setAttribute('aria-hidden',on?'false':'true');
+    }
+    ['progBtn','fbProg'].forEach(function(id){ var b=document.getElementById(id); if(b) b.onclick=function(){ setProg(true); }; });
+    document.getElementById('progClose').onclick=function(){ setProg(false); };
+    prev.onclick=function(){ goTo(state-1); }; next.onclick=function(){ goTo(state+1); };
+
+    var sx=0,sy=0,down=false;               // tap the page edge, or drag, to turn
+    stage.addEventListener('pointerdown',function(e){ down=true; sx=e.clientX; sy=e.clientY; });
+    stage.addEventListener('pointercancel',function(){ down=false; });
+    stage.addEventListener('pointerup',function(e){
+      if(!down) return; down=false;
+      var dx=e.clientX-sx, dy=e.clientY-sy;
+      if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)){ goTo(dx<0?state+1:state-1); return; }
+      if(Math.abs(dx)<10&&Math.abs(dy)<10){
+        if(!(e.target.closest&&e.target.closest('.leaf,.backcover'))){ setProg(false); return; }
+        var fwd=single?(e.clientX>innerWidth*0.38):(state===0?true:e.clientX>innerWidth/2);
+        goTo(fwd?state+1:state-1);
+      }
+    });
+    addEventListener('keydown',function(e){
+      if(!isOpen) return;
+      if(e.key==='Escape') setProg(false);
+      else if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' '){ e.preventDefault(); goTo(state+1); }
+      else if(e.key==='ArrowLeft'||e.key==='PageUp'){ goTo(state-1); }
+      else if(e.key==='Home') goTo(0); else if(e.key==='End') goTo(N-1);
+    });
+    var rz; addEventListener('resize',function(){            // rotate phone / resize window
+      clearTimeout(rz); rz=setTimeout(function(){
+        if(!built||wantSingle()===single) return;
+        state=wantSingle()?(state===0?0:2*state-1):Math.ceil(state/2); build();
+      },200);
+    });
   });
 })();
 </script>
