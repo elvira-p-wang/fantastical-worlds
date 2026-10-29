@@ -76,9 +76,16 @@
     -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
     transition:opacity .45s ease,visibility 0s linear .45s;
     --ph:min(80vh,56vw);--pw:calc(var(--ph)*.8);--u:calc(var(--pw)/100);--f:calc(var(--u)*var(--k,1))}
-  #programme.single{--ph:min(74vh,112vw);--k:1.28}
+  #programme.single{--ph:80vh;--pw:min(92vw,calc(var(--ph)*.8));--k:1.28}
+  @supports (height:1dvh){#programme.single{--ph:80dvh}}
+  html.prog-open,html.prog-open body{touch-action:pan-y}
+  #programme,.bk-stage{touch-action:pan-y}
+  .single .leaf.cur{transform:none}                 /* current page: no 3D transform, so it scrolls reliably */
+  .single .pf{grid-template-columns:1fr 1fr}
+  .single .bk-nav{top:auto;bottom:12px;transform:none;width:38px;height:38px;font-size:22px}
+  .single .bk-nav.prev{left:14px}.single .bk-nav.next{right:14px}
   #programme.open{opacity:1;visibility:visible;transition:opacity .45s ease}
-  .bk-stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;touch-action:none;
+  .bk-stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     filter:drop-shadow(0 26px 36px rgba(0,0,0,.5))}
   .bk-wrap{position:relative;width:var(--pw);height:var(--ph);perspective:2600px;
     opacity:0;transform:translateY(26px) scale(.95);
@@ -111,6 +118,10 @@
     background-color:#fffaf4;
     background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .35 0 0 0 0 .22 0 0 0 0 .3 0 0 0 .08 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
   .pg::-webkit-scrollbar{display:none}
+  /* "there is more below": soft fade at the foot of a page that scrolls */
+  .face.more::before{content:"";position:absolute;left:0;right:0;bottom:0;z-index:2;pointer-events:none;
+    height:calc(var(--f)*10);background:linear-gradient(rgba(255,250,244,0),rgba(255,250,244,.97) 78%)}
+  .face.more::before{border-radius:inherit}
   .pg .corner{position:absolute;top:calc(var(--f)*3.2);right:calc(var(--f)*3.6);width:calc(var(--f)*6)}
   .pg h2{margin:0 0 calc(var(--f)*3.4);text-align:center;font-weight:700;font-size:calc(var(--f)*6.6);line-height:1.05}
   .pg.blank{background-image:none}
@@ -419,7 +430,7 @@
   <div class="bk-stage" id="bkStage"><div class="bk-wrap"><div class="book" id="book" data-shift="0"></div></div></div>
   <button class="bk-nav prev" id="bkPrev" type="button" aria-label="Previous page">‹</button>
   <button class="bk-nav next" id="bkNext" type="button" aria-label="Next page">›</button>
-  <div class="bk-foot"><div class="bk-dots" id="bkDots"></div><div class="bk-hint"><span class="m">click a page edge or drag to turn</span><span class="t">swipe to turn the page</span></div></div>
+  <div class="bk-foot"><div class="bk-dots" id="bkDots"></div><div class="bk-hint"><span class="m">click a page edge or drag to turn</span><span class="t">swipe sideways to turn · scroll down for more</span></div></div>
 </div>
 <div id="ui">
   <button id="btnOverlay">poster&nbsp;[O]</button>
@@ -566,13 +577,24 @@
         dotsEl.appendChild(b);
       }
       state=Math.min(state,N-1); apply();
+      setTimeout(markScrollable,300); setTimeout(markScrollable,1500);   // again once the fonts have loaded
     }
     function apply(){
-      leaves.forEach(function(lf,i){ lf.classList.toggle('flipped',i<state); });
+      leaves.forEach(function(lf,i){ lf.classList.toggle('flipped',i<state); lf.classList.toggle('cur',i===state); });
       book.dataset.shift=(!single&&state>0)?'1':'0';
       for(var k=0;k<dotsEl.children.length;k++) dotsEl.children[k].classList.toggle('on',k===state);
       prev.disabled=(state===0); next.disabled=(state===N-1);
     }
+    function markScrollable(){              // fade the foot of any page that has more to scroll
+      leaves.forEach(function(lf){
+        [].forEach.call(lf.querySelectorAll('.face'),function(face){
+          var pg=face.querySelector('.pg'); if(!pg) return;
+          if(!pg._m){ pg._m=1; pg.addEventListener('scroll',function(){ upd(face,pg); },{passive:true}); }
+          upd(face,pg);
+        });
+      });
+    }
+    function upd(face,pg){ face.classList.toggle('more',pg.scrollHeight-pg.clientHeight>8&&pg.scrollTop+pg.clientHeight<pg.scrollHeight-8); }
     function swish(){                       // soft paper sound; respects the ♪ mute button
       try{
         var sb=document.getElementById('soundBtn'); if(sb&&sb.classList.contains('muted')) return;
@@ -590,9 +612,10 @@
     function goTo(s){ s=Math.max(0,Math.min(N-1,s)); if(s===state) return; swish(); state=s; apply(); }
     function setProg(on){
       if(on===isOpen) return; isOpen=on;
-      if(on){ if(!built||wantSingle()!==single){ state=0; build(); built=true; } }
+      if(on){ if(!built||wantSingle()!==single){ state=0; build(); built=true; } else setTimeout(markScrollable,300); }
       else setTimeout(function(){ if(!isOpen&&built){ state=0; apply(); } },600);   // back to the cover, unseen
       el.classList.toggle('open',on); el.setAttribute('aria-hidden',on?'false':'true');
+      document.documentElement.classList.toggle('prog-open',on);
     }
     ['progBtn','fbProg'].forEach(function(id){ var b=document.getElementById(id); if(b) b.onclick=function(){ setProg(true); }; });
     document.getElementById('progClose').onclick=function(){ setProg(false); };
