@@ -1854,7 +1854,7 @@ soundBtn.onclick=()=>setMusic(!musicOn);
 // concert day (Sydney time): music stays OFF by default so phones don't make noise in the hall.
 // The ♪ button still turns it on. Applies to 31 Oct 2026 only.
 let concertDay=false;
-try{ concertDay=new Intl.DateTimeFormat('en-CA',{timeZone:'Australia/Sydney'}).format(new Date())==='2026-10-31'; }catch(e){}
+try{ concertDay=new Intl.DateTimeFormat('en-CA',{timeZone:'Australia/Sydney'}).format(new Date())==='2026-10-31'; }catch(e){ concertDay=new Date(Date.now()+11*3600e3).toISOString().slice(0,10)==='2026-10-31'; }   // no-Intl fallback: Sydney = UTC+11 in October
 if(concertDay){
   setMusic(false);
 }else{
