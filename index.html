@@ -1851,15 +1851,23 @@ function setMusic(on){
 }
 soundBtn.onclick=()=>setMusic(!musicOn);
 // try autoplay immediately; browsers may block it until a user gesture
-bgm.play().then(()=>setMusic(true)).catch(()=>setMusic(false));
-// fallback: start on the first interaction if autoplay was blocked
-function primeOnce(){
-  if(!musicOn) setMusic(true);
-  removeEventListener('pointerdown',primeOnce);
-  removeEventListener('keydown',primeOnce);
+// concert day (Sydney time): music stays OFF by default so phones don't make noise in the hall.
+// The ♪ button still turns it on. Applies to 31 Oct 2026 only.
+let concertDay=false;
+try{ concertDay=new Intl.DateTimeFormat('en-CA',{timeZone:'Australia/Sydney'}).format(new Date())==='2026-10-31'; }catch(e){}
+if(concertDay){
+  setMusic(false);
+}else{
+  bgm.play().then(()=>setMusic(true)).catch(()=>setMusic(false));
+  // fallback: start on the first interaction if autoplay was blocked
+  function primeOnce(){
+    if(!musicOn) setMusic(true);
+    removeEventListener('pointerdown',primeOnce);
+    removeEventListener('keydown',primeOnce);
+  }
+  addEventListener('pointerdown',primeOnce,{once:true});
+  addEventListener('keydown',primeOnce,{once:true});
 }
-addEventListener('pointerdown',primeOnce,{once:true});
-addEventListener('keydown',primeOnce,{once:true});
 
 /* ================= intro: the world rises from the bottom ================= */
 const cv=renderer.domElement;
